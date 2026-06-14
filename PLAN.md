@@ -248,9 +248,6 @@ drift. Wazuh's self-monitoring is disabled, so a fresh board shows two lab alert
 housekeeping ones. The licence trio, DISCLAIMER, CODE-OF-CONDUCT and CLAUDE.md are in place
 (resolutions 6 and 8).
 
-An earlier Python-package scaffold (src/heimdallr, a rule regression-tester) was built against the
-wrong framing and cleared out before any commit.
-
 Next is M2: the routing feeder (MRT / BMP / JSON-timeline to Wazuh logs) and the routing-hijack
 scenario from inter-domain-simlab's false-origin artefact, once that lab exports its MRT seed and a
 scorer timeline. The baseline routing ruleset and the ot-modbus scenario are already stubbed under
