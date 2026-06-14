@@ -1,0 +1,10 @@
+<!--
+  heimdallr baseline decoders: routing-hijack.
+
+  The routing feeder emits JSON, one object per line, which Wazuh decodes
+  natively through log_format=json. Custom decoders are only needed if a raw,
+  non-JSON artefact (router syslog, say) has to be parsed. None yet.
+-->
+<decoder name="heimdallr-routing-placeholder">
+  <prematch>^heimdallr-routing-never-matches</prematch>
+</decoder>

@@ -1,0 +1,10 @@
+<!--
+  heimdallr baseline decoders: ot-modbus.
+
+  Zeek's modbus.log arrives as JSON and decodes natively. Host-event logs from
+  the ics-access servers are emitted as JSON too (after that lab's export
+  adaptation, M3). Custom decoders land here only for any raw text log.
+-->
+<decoder name="heimdallr-ot-placeholder">
+  <prematch>^heimdallr-ot-never-matches</prematch>
+</decoder>

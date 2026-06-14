@@ -1,0 +1,23 @@
+<!--
+  heimdallr baseline ruleset: ot-modbus.
+
+  Seed for the ot-modbus scenario. Matches Zeek's modbus.log (shipped as JSON by
+  the collector) and the ics-access host-event logs. Placeholder thresholds; tune
+  against a real Modbus capture once ics-access exports one (M3).
+-->
+<group name="heimdallr,ot,modbus,">
+
+  <rule id="920000" level="0">
+    <decoded_as>json</decoded_as>
+    <field name="func">\.+</field>
+    <description>heimdallr Modbus event</description>
+  </rule>
+
+  <rule id="920010" level="6">
+    <if_sid>920000</if_sid>
+    <field name="func">WRITE_SINGLE_REGISTER|WRITE_MULTIPLE_REGISTERS|WRITE_SINGLE_COIL|WRITE_MULTIPLE_COILS</field>
+    <description>OT: Modbus write to $(unit)/$(address)</description>
+    <group>modbus_write,</group>
+  </rule>
+
+</group>

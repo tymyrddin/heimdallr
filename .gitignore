@@ -1,0 +1,33 @@
+# Secrets and generated env
+.env
+
+# Generated TLS certificates (created by the certs generator on first `ctl up`).
+compose/config/wazuh_indexer_ssl_certs/*
+
+# Rendered indexer internal_users.yml (ctl derives it from .env; template is
+# committed as internal_users.template.yml).
+compose/config/wazuh_indexer/internal_users.yml
+
+# Ingest is real captures dropped in by the operator. Keep the directory and the
+# small committed samples, ignore everything else that lands here.
+ingest/*
+!ingest/README.md
+!ingest/samples/
+ingest/samples/*
+!ingest/samples/README.md
+
+# Live rule workspace is seeded from rules/baseline by ctl; do not commit edits.
+rules/workspace/*
+
+# Sensor scratch
+*.pcap.tmp
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store

@@ -1,0 +1,7 @@
+# heimdallr starter Suricata signatures. Replace these with real detections as
+# scenarios land. Keep sids in the local range (>= 9000000).
+
+# A deliberately loud smoke signature: fires on any packet, so the M1 benign
+# pcap produces an alert that flows end to end to the dashboard. Disable it once
+# the range is proven.
+alert ip any any -> any any (msg:"heimdallr smoke: packet seen"; sid:9000001; rev:1;)

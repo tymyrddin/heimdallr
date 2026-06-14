@@ -1,0 +1,44 @@
+<!--
+  heimdallr baseline ruleset: routing-hijack.
+
+  Seed for the routing-hijack scenario, copied into rules/workspace by ctl. These
+  mirror the blue single-signal hunts (MOAS, more-specific, RPKI-invalid). They
+  match the JSON the routing feeder emits (feeders/routing.py, M2); the exact
+  field names are pinned when that feeder lands. Treat these as a starting point
+  to extend in the workspace, not as finished detections.
+-->
+<group name="heimdallr,routing,">
+
+  <rule id="910000" level="0">
+    <decoded_as>json</decoded_as>
+    <field name="substrate">routing</field>
+    <description>heimdallr routing event</description>
+  </rule>
+
+  <rule id="910010" level="8">
+    <if_sid>910000</if_sid>
+    <field name="event_type">announce</field>
+    <field name="moas">true</field>
+    <description>Routing: MOAS, prefix $(prefix) announced by a second origin $(origin_asn)</description>
+    <group>moas,</group>
+    <mitre>
+      <id>T1574</id>
+    </mitre>
+  </rule>
+
+  <rule id="910011" level="8">
+    <if_sid>910000</if_sid>
+    <field name="event_type">announce</field>
+    <field name="more_specific">true</field>
+    <description>Routing: more-specific of $(covering_prefix) seen as $(prefix) from $(origin_asn)</description>
+    <group>more_specific,</group>
+  </rule>
+
+  <rule id="910012" level="6">
+    <if_sid>910000</if_sid>
+    <field name="validity">invalid</field>
+    <description>Routing: RPKI-invalid announcement $(prefix) from $(origin_asn)</description>
+    <group>rpki,</group>
+  </rule>
+
+</group>
