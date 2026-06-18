@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}&middot; Experiments{% endblock %}
+{% block content %}
+<h1>Experiments</h1>
+<p class="lede">The detection-engineer's notebook: every run, with the rules it used pinned by
+content hash. Diffs between runs land in a later slice; for now this is the ledger the Run
+spine writes.</p>
+
+{% if not runs %}
+<p class="muted">No runs yet. Once the Detections page can launch one (or via the spine API),
+they appear here.</p>
+{% else %}
+<table class="grid">
+  <thead>
+    <tr><th>Run</th><th>When</th><th>Bundles</th><th class="num">Findings</th><th>Status</th><th>Ruleset</th></tr>
+  </thead>
+  <tbody>
+  {% for r in runs %}
+    <tr>
+      <td><code>{{ r.run_id }}</code></td>
+      <td class="muted">{{ r.created }}</td>
+      <td>{{ r.bundles | join(', ') }}</td>
+      <td class="num">{{ r.counts.findings if r.counts else 0 }}</td>
+      <td><span class="badge {{ r.status }}">{{ r.status }}</span></td>
+      <td class="muted"><code>{{ r.ruleset_sha256[:8] if r.ruleset_sha256 }}</code></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}

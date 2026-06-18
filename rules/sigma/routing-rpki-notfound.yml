@@ -1,0 +1,22 @@
+title: RPKI not-found BGP announcement of monitored space
+status: experimental
+description: >
+  An announcement of monitored space with no covering ROA in the observed VRP set
+  (RPKI not-found by RFC 6811). On its own a not-found is common on the real
+  internet, so this is scoped to monitored space (covering_aggregate present) to
+  stay quiet: it is the signal behind the incomplete-RPKI hijack and, after a ROA
+  removal, the ROA-poisoning hijack. Validity is derived by the routing ingest
+  pipeline against the observed VRPs.
+logsource:
+  product: routing
+detection:
+  selection:
+    type: announce
+    rpki_validity: notfound
+    covering_aggregate: "*"
+  condition: selection
+fields:
+  - prefix
+  - origin_as
+  - covering_aggregate
+level: medium

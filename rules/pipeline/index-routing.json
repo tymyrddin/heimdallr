@@ -1,0 +1,32 @@
+{
+  "index_patterns": ["routing*"],
+  "template": {
+    "settings": { "index.number_of_shards": 1, "index.number_of_replicas": 0,
+                  "index.default_pipeline": "routing" },
+    "mappings": {
+      "properties": {
+        "network_address":        { "type": "ip" },
+        "network_prefix_length":  { "type": "integer" },
+        "origin_as":              { "type": "long" },
+        "asn":                    { "type": "long" },
+        "peer_as":                { "type": "long" },
+        "as_path":                { "type": "long" },
+        "max_length":             { "type": "integer" },
+        "type":                   { "type": "keyword" },
+        "substrate":              { "type": "keyword" },
+        "observer":               { "type": "keyword" },
+        "bundle":               { "type": "keyword" },
+        "policy":                 { "type": "keyword" },
+        "roa_action":             { "type": "keyword" },
+        "prefix":                 { "type": "keyword" },
+        "ts":                     { "type": "date" },
+
+        "covering_aggregate":     { "type": "keyword" },
+        "covering_prefix_length": { "type": "integer" },
+        "more_specific":          { "type": "boolean" },
+        "origin_authorised":      { "type": "boolean" },
+        "rpki_validity":          { "type": "keyword" }
+      }
+    }
+  }
+}

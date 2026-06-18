@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}&middot; {{ meta.name }}{% endblock %}
+{% block content %}
+<p class="crumb"><a href="{{ url_for('data') }}">Data</a> / {{ meta.name }}</p>
+<h1>{{ meta.name }}</h1>
+
+<div class="meta">
+  <span><strong>{{ '{:,}'.format(meta.events) }}</strong> events</span>
+  <span>{{ '{:,}'.format(meta.announces) }} announce</span>
+  <span>{{ '{:,}'.format(meta.withdraws) }} withdraw</span>
+  <span>{{ meta.vrp_count }} VRPs</span>
+  <span>paths up to {{ meta.max_hops }} hops</span>
+  {% for x in meta.extras %}<span class="tag">+{{ x }}</span>{% endfor %}
+  {% if meta.loaded %}<span class="dot on"></span>loaded{% else %}<span class="dot off"></span>not loaded{% endif %}
+</div>
+<p class="muted">origins: {{ meta.origins | join(', ') }}</p>
+<p class="muted">files: {% for f in meta.files %}<code>{{ f }}</code> {% endfor %}</p>
+
+<h2>Browse events</h2>
+<p class="lede">Read straight from the artefact, so this works before the bundle is loaded.
+The most common answer to "why didn't my rule fire" is here: the data was not what you
+thought it was.</p>
+
+<table class="grid events">
+  <thead>
+    <tr><th>#</th><th>Timestamp</th><th>Prefix</th><th class="num">Origin</th><th>Type</th><th>AS_PATH</th><th></th></tr>
+  </thead>
+  <tbody>
+  {% for ev in page.rows %}
+    <tr>
+      <td class="muted">{{ page.offset + loop.index0 }}</td>
+      <td>{{ ev.ts }}</td>
+      <td>{{ ev.prefix }}</td>
+      <td class="num">{{ ev.origin_as if ev.origin_as is not none else '&mdash;' | safe }}</td>
+      <td><span class="evtype {{ ev.type }}">{{ ev.type }}</span></td>
+      <td class="path">{{ (ev.as_path or []) | join(' ') }}</td>
+      <td><details><summary>raw</summary><pre>{{ ev | tojson(indent=2) }}</pre></details></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<div class="pager">
+  {% set prev = page.offset - page.size %}
+  {% set next = page.offset + page.size %}
+  {% if page.offset > 0 %}<a href="?offset={{ prev if prev > 0 else 0 }}">&larr; prev</a>{% endif %}
+  <span class="muted">{{ page.offset + 1 }}&ndash;{{ page.offset + page.rows|length }} of {{ '{:,}'.format(page.total) }}</span>
+  {% if next < page.total %}<a href="?offset={{ next }}">next &rarr;</a>{% endif %}
+</div>
+{% endblock %}

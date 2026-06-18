@@ -1,23 +1,9 @@
-# Secrets and generated env
+# Local credentials / env. OpenSearch runs security-disabled on the local node, so
+# none is required; this just makes sure an operator's local .env is never committed.
 .env
 
-# Generated TLS certificates (created by the certs generator on first `ctl up`).
-compose/config/wazuh_indexer_ssl_certs/*
-
-# Rendered indexer internal_users.yml (ctl derives it from .env; template is
-# committed as internal_users.template.yml).
-compose/config/wazuh_indexer/internal_users.yml
-
-# Ingest is real captures dropped in by the operator. Keep the directory and the
-# small committed samples, ignore everything else that lands here.
-ingest/*
-!ingest/README.md
-!ingest/samples/
-ingest/samples/*
-!ingest/samples/README.md
-
-# Live rule workspace is seeded from rules/baseline by ctl; do not commit edits.
-rules/workspace/*
+# ingest/ is tracked: the bundle directories (raw telemetry, and an optional brief
+# alongside) ship with the lab, so a fresh clone runs the scenarios out of the box.
 
 # Sensor scratch
 *.pcap.tmp
@@ -26,6 +12,7 @@ rules/workspace/*
 __pycache__/
 *.py[cod]
 .venv/
+venv/
 
 # IDE / OS
 .idea/

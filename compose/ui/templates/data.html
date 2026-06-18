@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}&middot; Data{% endblock %}
+{% block content %}
+<h1>Data</h1>
+<p class="lede">Bundles in <code>ingest/</code>. Bundles are data: load what you want to
+test against, or load all for the SOC-chaos case. Loading is idempotent &mdash; re-loading
+a bundle replaces its docs, never duplicates them.</p>
+
+{% if not stack_up %}
+<p class="warn">OpenSearch is not answering, so loading is unavailable. Start the stack with
+<code>./ctl up</code>.</p>
+{% endif %}
+
+<form method="post" action="{{ url_for('bundles_load') }}">
+<table class="grid">
+  <thead>
+    <tr><th></th><th>Bundle</th><th class="num">Events</th><th>Substrate</th><th>State</th><th></th></tr>
+  </thead>
+  <tbody>
+  {% for b in bundles %}
+    <tr>
+      <td><input type="checkbox" name="bundles" value="{{ b.name }}" id="cb-{{ b.name }}"></td>
+      <td><a href="{{ url_for('bundle_detail', name=b.name) }}">{{ b.name }}</a></td>
+      <td class="num">{{ '{:,}'.format(b.events) }}</td>
+      <td>
+        routing{% for x in b.extras %} <span class="tag">+{{ x }}</span>{% endfor %}
+      </td>
+      <td>
+        {% if b.loaded %}<span class="dot on"></span>loaded ({{ '{:,}'.format(b.loaded_docs) }} docs)
+        {% else %}<span class="dot off"></span>not loaded{% endif %}
+      </td>
+      <td>
+        {% if b.loaded %}
+        <button type="submit" formaction="{{ url_for('bundles_unload') }}" name="bundle" value="{{ b.name }}" class="link-btn">unload</button>
+        {% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<div class="actions">
+  <button type="submit" {{ 'disabled' if not stack_up }}>Load selected</button>
+  <button type="submit" id="load-all" formnovalidate {{ 'disabled' if not stack_up }}>Load all</button>
+</div>
+</form>
+
+{% if recent_jobs %}
+<h2>Recent activity</h2>
+<ul class="joblog">
+  {% for j in recent_jobs %}
+  <li class="job {{ j.status }}">
+    <span class="badge {{ j.status }}">{{ j.status }}</span>
+    {{ j.label }}
+    {% if j.result and j.result.indexed is defined %} &middot; {{ '{:,}'.format(j.result.indexed) }} docs{% endif %}
+    {% if j.result and j.result.deleted is defined %} &middot; {{ '{:,}'.format(j.result.deleted) }} removed{% endif %}
+    {% if j.error %} &middot; <span class="err">failed</span>{% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+<script>
+  // "Load all" ticks every box then submits the form.
+  document.getElementById('load-all')?.addEventListener('click', function (e) {
+    document.querySelectorAll('input[name=bundles]').forEach(cb => cb.checked = true);
+  });
+</script>
+{% endblock %}

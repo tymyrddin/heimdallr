@@ -1,0 +1,43 @@
+{
+  "_comment": "heimdallr routing correlation: ROA-poisoning arm -> hijack. A single bucket-level aggregation (the form an OpenSearch Alerting bucket-level monitor runs). It buckets by (bundle, covering_aggregate) and selects buckets where a ROA-remove (the arm) is followed by a not-found announcement under the same aggregate (the hijack). The join key is the generic covering_aggregate, not a hardcoded prefix; both roa-change and announce docs carry it from the ingest pipeline. Runs across the full event stream, not a slice.",
+  "size": 0,
+  "query": { "bool": { "filter": [ { "terms": { "type": ["roa-change", "announce"] } } ] } },
+  "aggs": {
+    "armed_aggregates": {
+      "composite": {
+        "size": 1000,
+        "sources": [
+          { "bundle": { "terms": { "field": "bundle" } } },
+          { "cover": { "terms": { "field": "covering_aggregate" } } }
+        ]
+      },
+      "aggs": {
+        "arm_remove": {
+          "filter": { "bool": { "filter": [
+            { "term": { "type": "roa-change" } },
+            { "term": { "roa_action": "remove" } }
+          ] } },
+          "aggs": { "first": { "min": { "field": "ts" } } }
+        },
+        "hijack_notfound": {
+          "filter": { "bool": { "filter": [
+            { "term": { "type": "announce" } },
+            { "term": { "rpki_validity": "notfound" } }
+          ] } },
+          "aggs": { "last": { "max": { "field": "ts" } } }
+        },
+        "arm_then_hijack": {
+          "bucket_selector": {
+            "buckets_path": {
+              "arm": "arm_remove._count",
+              "hij": "hijack_notfound._count",
+              "arm_ts": "arm_remove>first",
+              "hij_ts": "hijack_notfound>last"
+            },
+            "script": "params.arm > 0 && params.hij > 0 && params.hij_ts > params.arm_ts"
+          }
+        }
+      }
+    }
+  }
+}

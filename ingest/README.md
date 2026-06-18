@@ -2,17 +2,19 @@
 
 The boundary with the attack labs: a directory, not a wire.
 
-Captures and logs exported from inter-domain-simlab, ics-access-simlab and
-huginn-and-muninn are dropped here, and the sensors read them in file mode when
-you run `./ctl ingest`.
+Telemetry exported from inter-domain-simlab, ics-access-simlab and
+huginn-and-muninn is dropped here as bundle directories, one per attack. `./ctl
+ingest` relays the routing bundles into OpenSearch (the feeder + the enrichment
+pipeline); `./ctl detect` runs the Sigma rules and the correlation over them.
 
-What goes where:
+A bundle is a directory, `ingest/<bundle>/`, holding the raw artefacts and, if
+wanted, a short brief alongside them. By substrate:
 
-- `*.pcap`, `*.pcapng`: read by Zeek and Suricata. OT Modbus traffic and any
-  packet-level material.
-- host-event logs (JSON): tailed straight by the collector into Wazuh.
-- routing artefacts (MRT / BMP / RPKI / JSON timeline): passed through
-  `feeders/routing.py` first, since BGP is not pcap-shaped (M2).
+- routing (the current profile): `events.jsonl` (the BMP announce/withdraw
+  stream), `roa-history.txt` (ROA changes), `vrps.json` (the validated-ROA set).
+  Relayed by `feeders/routing.py` as observations, since BGP is not pcap-shaped.
+- pcap (`*.pcap`, `*.pcapng`): read by Zeek and Suricata. OT Modbus traffic and
+  any packet-level material. A later milestone; `sensors/` is parked for it.
 
-The contents of this directory are gitignored: real captures stay out of git.
-Small illustrative samples can live under `samples/`.
+The bundle directories are committed, so a fresh clone runs the scenarios out of
+the box. The doctrine briefs live in blue, not here.
