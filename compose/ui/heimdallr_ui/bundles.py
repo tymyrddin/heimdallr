@@ -1,14 +1,9 @@
-"""Read-side of the Data page: list bundles in ingest/, their metadata, and the
-bundle explorer (paged event browsing + raw JSON).
-
-This reads the ingest artefacts directly, so the explorer works before a bundle is
-loaded. "Why didn't my rule fire" is usually answered here: the data was not what
-you thought. Loaded-state is layered on from the routing index.
-"""
+"""Dataset browser: list datasets in ingest/, their metadata, and event browsing."""
 from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 
 from . import config, osclient
 
@@ -17,63 +12,34 @@ def _bundle_dirs() -> list[str]:
     root = config.INGEST_DIR
     if not os.path.isdir(root):
         return []
-    out = []
-    for name in sorted(os.listdir(root)):
-        d = os.path.join(root, name)
-        if os.path.isdir(d) and os.path.isfile(os.path.join(d, "events.jsonl")):
-            out.append(name)
-    return out
+    return sorted(
+        n for n in os.listdir(root)
+        if os.path.isdir(os.path.join(root, n))
+        and any(Path(os.path.join(root, n)).glob("*.jsonl"))
+    )
 
 
-def _event_count(name: str) -> int:
-    path = os.path.join(config.INGEST_DIR, name, "events.jsonl")
+def _event_count(bundle_dir: Path) -> int:
     n = 0
-    try:
-        with open(path) as fh:
-            for _ in fh:
-                n += 1
-    except OSError:
-        return 0
+    for jsonl_file in bundle_dir.glob("*.jsonl"):
+        try:
+            with jsonl_file.open() as fh:
+                for _ in fh:
+                    n += 1
+        except OSError:
+            pass
     return n
 
 
-def _extras(name: str) -> list[str]:
-    """Substrate extras a bundle carries beyond plain routing: an AS_PATH on its
-    events (+path), an IRR export (+IRR). Read from the artefacts, not assumed."""
-    d = os.path.join(config.INGEST_DIR, name)
-    extras = []
-    events = os.path.join(d, "events.jsonl")
-    try:
-        with open(events) as fh:
-            for raw in fh:
-                raw = raw.strip()
-                if not raw:
-                    continue
-                try:
-                    ev = json.loads(raw)
-                except ValueError:
-                    continue
-                # Decide on the first announce: withdraws carry no path.
-                if ev.get("type") == "announce":
-                    if ev.get("as_path"):
-                        extras.append("path")
-                    break
-    except OSError:
-        pass
-    if os.path.isfile(os.path.join(d, "irr-routes.txt")):
-        extras.append("IRR")
-    return extras
-
-
 def list_bundles() -> list[dict]:
-    """Every bundle in ingest/ with event count, extras, and loaded state."""
-    loaded = osclient.loaded_bundles(config.ROUTING_INDEX)
+    """Every dataset in ingest/ with event count and loaded state."""
+    loaded = osclient.loaded_bundles(config.LOGS_INDEX)
     out = []
     for name in _bundle_dirs():
+        bundle_dir = Path(config.INGEST_DIR) / name
         out.append({
             "name": name,
-            "events": _event_count(name),
-            "extras": _extras(name),
+            "events": _event_count(bundle_dir),
             "loaded": name in loaded,
             "loaded_docs": loaded.get(name, 0),
         })
@@ -81,75 +47,44 @@ def list_bundles() -> list[dict]:
 
 
 def bundle_metadata(name: str) -> dict | None:
-    d = os.path.join(config.INGEST_DIR, name)
-    if not os.path.isdir(d):
+    bundle_dir = Path(config.INGEST_DIR) / name
+    if not bundle_dir.is_dir():
         return None
-    origins: set[int] = set()
-    max_hops = 0
-    announces = withdraws = 0
-    events_path = os.path.join(d, "events.jsonl")
-    try:
-        with open(events_path) as fh:
-            for raw in fh:
-                raw = raw.strip()
-                if not raw:
-                    continue
-                try:
-                    ev = json.loads(raw)
-                except ValueError:
-                    continue
-                if ev.get("type") == "announce":
-                    announces += 1
-                    if ev.get("origin_as") is not None:
-                        origins.add(ev["origin_as"])
-                    max_hops = max(max_hops, len(ev.get("as_path") or []))
-                elif ev.get("type") == "withdraw":
-                    withdraws += 1
-    except OSError:
+    files = sorted(f for f in os.listdir(bundle_dir) if (bundle_dir / f).is_file())
+    jsonl_files = [f for f in files if f.endswith(".jsonl")]
+    if not jsonl_files:
         return None
-
-    vrp_count = 0
-    vpath = os.path.join(d, "vrps.json")
-    if os.path.isfile(vpath):
-        try:
-            vrp_count = len(json.load(open(vpath)).get("roas", []))
-        except (OSError, ValueError):
-            vrp_count = 0
-
-    files = sorted(f for f in os.listdir(d) if os.path.isfile(os.path.join(d, f)))
-    loaded = osclient.loaded_bundles(config.ROUTING_INDEX)
+    loaded = osclient.loaded_bundles(config.LOGS_INDEX)
     return {
         "name": name,
-        "events": announces + withdraws,
-        "announces": announces,
-        "withdraws": withdraws,
-        "origins": sorted(origins),
-        "max_hops": max_hops,
-        "vrp_count": vrp_count,
-        "extras": _extras(name),
         "files": files,
+        "jsonl_files": jsonl_files,
+        "events": _event_count(bundle_dir),
         "loaded": name in loaded,
         "loaded_docs": loaded.get(name, 0),
     }
 
 
 def browse_events(name: str, offset: int = 0, size: int = 50) -> dict:
-    """A page of raw BMP events for the explorer, read straight from the artefact."""
-    path = os.path.join(config.INGEST_DIR, name, "events.jsonl")
+    """A page of raw events for the explorer, read straight from the JSONL files."""
+    bundle_dir = Path(config.INGEST_DIR) / name
     rows = []
     total = 0
-    try:
-        with open(path) as fh:
-            for i, raw in enumerate(fh):
-                raw = raw.strip()
-                if not raw:
-                    continue
-                total += 1
-                if offset <= i < offset + size:
-                    try:
-                        rows.append(json.loads(raw))
-                    except ValueError:
-                        rows.append({"_raw": raw})
-    except OSError:
-        return {"name": name, "rows": [], "total": 0, "offset": offset, "size": size}
+    i = 0
+    for jsonl_file in sorted(bundle_dir.glob("*.jsonl")):
+        try:
+            with jsonl_file.open() as fh:
+                for raw in fh:
+                    raw = raw.strip()
+                    if not raw:
+                        continue
+                    total += 1
+                    if offset <= i < offset + size:
+                        try:
+                            rows.append(json.loads(raw))
+                        except ValueError:
+                            rows.append({"_raw": raw})
+                    i += 1
+        except OSError:
+            break
     return {"name": name, "rows": rows, "total": total, "offset": offset, "size": size}

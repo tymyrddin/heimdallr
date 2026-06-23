@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""Bulk-ship routing observations into OpenSearch.
+"""Bulk-ship a JSONL file into OpenSearch.
 
-Reads the feeder's JSON-lines output and bulk-indexes it into the routing index
-in batches. The index's default pipeline (heimdallr's routing enrichment) runs on
-ingest, so what lands is the raw observation plus the derived detection fields.
-Pure stdlib; the feeder image carries no detection logic.
+Reads a JSON-lines file and bulk-indexes it into the target index in batches.
+Pure stdlib; no detection logic.
 """
 import json
 import os
@@ -12,7 +10,7 @@ import sys
 import urllib.request
 
 OS_URL = os.environ.get("OPENSEARCH_URL", "http://localhost:9200")
-INDEX = os.environ.get("ROUTING_INDEX", "routing")
+INDEX = os.environ.get("LOGS_INDEX", "logs")
 BATCH = 5000
 
 
@@ -52,8 +50,8 @@ def main(path):
             if n % BATCH == 0:
                 flush()
     flush()
-    print(f"[load] indexed {n} observations into {INDEX} ({errors} errors)")
+    print(f"[load] indexed {n} docs into {INDEX} ({errors} errors)")
 
 
 if __name__ == "__main__":
-    main(sys.argv[1] if len(sys.argv) > 1 else "/tmp/routing.json")
+    main(sys.argv[1])

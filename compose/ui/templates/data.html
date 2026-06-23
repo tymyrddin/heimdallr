@@ -2,9 +2,8 @@
 {% block title %}&middot; Data{% endblock %}
 {% block content %}
 <h1>Data</h1>
-<p class="lede">Bundles in <code>ingest/</code>. Bundles are data: load what you want to
-test against, or load all for the SOC-chaos case. Loading is idempotent &mdash; re-loading
-a bundle replaces its docs, never duplicates them.</p>
+<p class="lede">Datasets in <code>ingest/</code>. Each is a directory of <code>.jsonl</code>
+files. Loading is idempotent &mdash; re-loading a dataset replaces its docs, never duplicates them.</p>
 
 {% if not stack_up %}
 <p class="warn">OpenSearch is not answering, so loading is unavailable. Start the stack with
@@ -14,7 +13,7 @@ a bundle replaces its docs, never duplicates them.</p>
 <form method="post" action="{{ url_for('bundles_load') }}">
 <table class="grid">
   <thead>
-    <tr><th></th><th>Bundle</th><th class="num">Events</th><th>Substrate</th><th>State</th><th></th></tr>
+    <tr><th></th><th>Dataset</th><th class="num">Events</th><th>State</th><th></th></tr>
   </thead>
   <tbody>
   {% for b in bundles %}
@@ -22,9 +21,6 @@ a bundle replaces its docs, never duplicates them.</p>
       <td><input type="checkbox" name="bundles" value="{{ b.name }}" id="cb-{{ b.name }}"></td>
       <td><a href="{{ url_for('bundle_detail', name=b.name) }}">{{ b.name }}</a></td>
       <td class="num">{{ '{:,}'.format(b.events) }}</td>
-      <td>
-        routing{% for x in b.extras %} <span class="tag">+{{ x }}</span>{% endfor %}
-      </td>
       <td>
         {% if b.loaded %}<span class="dot on"></span>loaded ({{ '{:,}'.format(b.loaded_docs) }} docs)
         {% else %}<span class="dot off"></span>not loaded{% endif %}
@@ -60,7 +56,6 @@ a bundle replaces its docs, never duplicates them.</p>
 {% endif %}
 
 <script>
-  // "Load all" ticks every box then submits the form.
   document.getElementById('load-all')?.addEventListener('click', function (e) {
     document.querySelectorAll('input[name=bundles]').forEach(cb => cb.checked = true);
   });

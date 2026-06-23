@@ -1,114 +1,82 @@
 # Heimdallr
 
-The watchman. A live detection range where a defender practises spotting the
-attack labs' handiwork in a real stack, against real telemetry, by hand.
+A detection engineering tool built on OpenSearch and Sigma. Load any JSONL dataset,
+write or import Sigma rules, run them, and see exactly what fired and what did not —
+scoped per dataset so you can tell whether a rule is specific or noisy.
 
-heimdallr is the blue counterpart to the attack-only labs (`inter-domain-simlab`
-for routing, `ics-access-simlab` for OT) and pairs with the `huginn-and-muninn`
-observation toolkit, the eyes. It runs OpenSearch with a dashboard, takes
-telemetry in as files through `ingest/`, derives the anomalies itself in the
-detection layer, and surfaces them so the practitioner can hunt and tune. It does
-not run the attacks, and it does not sniff a live wire: the boundary with the
-attack labs is a directory, not a wire.
-
-Where the attack labs make a thing happen, heimdallr is where you learn to see it:
-observations go in, the practitioner builds the detection, and nothing is
-hand-authored to make a rule fire.
+Four views drive the workflow: **Data** (what you have loaded), **Detections** (which
+rules to run), **Findings** (what fired, per dataset), **Experiments** (how results
+change as you iterate on a rule).
 
 ## Dependencies
 
-Linux with Docker. The OpenSearch node wants memory, so give it room.
+Linux with Docker. The OpenSearch node wants memory.
 
-| Dependency | Notes                                                          |
-|------------|----------------------------------------------------------------|
-| Linux      | kernel 5.x+ (`vm.max_map_count=262144` for OpenSearch)         |
-| Docker     | Engine 24+ with the compose plugin                             |
-| RAM        | ~4 GB free; the single OpenSearch node is not shy              |
+| Dependency | Notes                                                  |
+|------------|--------------------------------------------------------|
+| Linux      | kernel 5.x+ (`vm.max_map_count=262144` for OpenSearch) |
+| Docker     | Engine 24+ with the compose plugin                     |
+| RAM        | ~4 GB free; the single OpenSearch node is not shy      |
 
-Security (auth/TLS) is disabled: this is a local range, not an exposed service, so
-keep the ports on the host.
+Security (auth/TLS) is disabled: this is a local tool, not an exposed service.
+Do not expose these ports off the host.
 
 ## Quickstart
 
 ```bash
-./ctl up        # start OpenSearch + Dashboards + the UI, apply the index template + pipeline
-./ctl ingest    # relay ingest/ into OpenSearch (the routing feeder + the enrichment)
-./ctl detect    # compile the Sigma rules and run detections + the arm->hijack correlation
-./ctl ui        # the UI URL; ./ctl dashboard for OpenSearch Dashboards
+./ctl up        # start OpenSearch + Dashboards + the UI
+./ctl ui        # print the UI URL
+./ctl detect    # compile Sigma rules and run detections (CLI shortcut)
+./ctl dashboard # print the OpenSearch Dashboards URL
 ```
 
-You come up at the UI on `http://localhost:5000`: the Data page lists the bundles
-staged under `ingest/`, where you pick which to load (or load all, for the
-SOC-chaos case) and browse a bundle's raw events before loading a thing. The
-detections run from `ctl detect` today, with the per-bundle run-and-findings view
-landing in the UI next. Dashboards on `http://localhost:5601` is the deep
-hunt-and-tune surface.
+Open `http://localhost:5000`:
 
-With the bundles already committed under `ingest/`, `up` then `ingest` then
-`detect` shows the routing hijacks firing end to end before you write a thing.
+1. **Data** — drop a dataset directory under `ingest/`, then click **Load**.
+2. **Detections** — pick rules from `rules/sigma/` or author a new one.
+3. **Findings** — see what fired, per dataset, with a representative event.
+4. **Experiments** — compare runs as you iterate on a rule.
 
-## Bundles
+OpenSearch Dashboards at `http://localhost:5601` is the deep hunt-and-tune surface.
 
-A bundle is a directory under `ingest/`: the raw telemetry an attack lab exported
-(for routing, `events.jsonl` + `roa-history.txt` + `vrps.json`), self-describing by
-its name. The detection content is not per-bundle: heimdallr's baseline, the ingest
-pipeline and the Sigma rules apply across whatever is staged, so a rule either
-detects its pattern wherever it occurs or it does not.
+## Datasets
 
-| Bundle                        | What it exercises                                     | Detected today |
-|-------------------------------|-------------------------------------------------------|----------------|
-| `false-origin-prefix-hijack`  | a more-specific from an unauthorised origin           | yes            |
-| `incomplete-rpki-hijack`      | a monitored prefix with no covering ROA (MOAS)        | yes            |
-| `roa-poisoning-hijack`        | a ROA removal, then the prefix surfaces (arm->hijack) | yes            |
-| `route-leak-hijack`           | a valley-free violation in the AS_PATH                | awaiting rules |
-| `route-legitimacy-subversion` | a forged IRR route-object behind a more-specific      | partial        |
-| `policy-trust-abuse-hijack`   | a peer-trust / route-policy abuse                     | partial        |
-| `legitimate-peering-hijack`   | injection over a real peering session                 | awaiting rules |
+A dataset is a directory under `ingest/<name>/` holding one or more `.jsonl` files
+(newline-delimited JSON, one event per line). The directory name becomes the dataset
+label in the UI and in findings.
 
-The first three fire end to end against the baseline rules. The newer four are
-staged real telemetry awaiting their detection content; building it is the practice.
+See `ingest/README.md` for layout conventions and an EVTX conversion one-liner.
 
-## Status
+Good public sources:
 
-M2 (the routing profile) is built and validated end to end on the real stack. The
-feeder relays the raw routing telemetry as observations only, an OpenSearch ingest
-pipeline normalises and enriches each (RFC 6811 origin validation and the covering
-aggregate, the one derivation no signature rule can do), and Sigma rules plus the
-arm->hijack correlation derive the anomalies against heimdallr's own baseline. The
-three routing-hijack bundles fire and generalise, and the benign flood fires
-nothing.
+| Dataset | What it covers | Where |
+|---|---|---|
+| **OTRF Security Datasets** | Windows/Linux attack simulations, labelled by ATT&CK technique, JSONL-ready | github.com/OTRF/Security-Datasets |
+| **EVTX-ATTACK-SAMPLES** | Windows event log `.evtx` files per ATT&CK technique | github.com/sbousseaden/EVTX-ATTACK-SAMPLES |
+| **Atomic Red Team** | Test results from individual ATT&CK technique executions | github.com/redcanaryco/atomic-red-team |
+| **Boss of the SOC (BOTS) v3** | Full SOC scenario dataset | github.com/splunk/botsv3 |
 
-The UI is coming up: the Data page (browse and load bundles) and the run spine (a
-run, its rules pinned by content hash, and its findings) are built and validated;
-the Detections, Findings and Experiments pages are landing on top.
+OTRF Security Datasets is the easiest starting point — many datasets ship as `.jsonl`
+already, each tagged with the ATT&CK technique it exercises.
 
-## Roadmap
+## Rules
 
-- Detection content for the newer bundles: AS_PATH analysis for route leaks, an IRR
-  feed with an IRR-versus-RPKI rule for the legitimacy subversion, and the peer-trust
-  and route-policy signals.
-- Portability: export a detection written here to other backends (Splunk, Elastic,
-  and so on), the payoff of authoring in vendor-neutral Sigma.
-- SOC mode and real-internet noise: always-on monitors, and `huginn-and-muninn`
-  captures as a benign corpus for tuning the false-positive rate.
-- The OT profile (Zeek and Suricata over pcaps), parked until `ics-access-simlab`
-  exports artefacts.
+Sigma rules live under `rules/sigma/`. Any `.yml` file there is picked up automatically
+by the detector and the UI's rule selector.
+
+The [Sigma specification](https://github.com/SigmaHQ/sigma-specification) covers the
+rule format. The [SigmaHQ community repo](https://github.com/SigmaHQ/sigma) has 3000+
+rules across Windows, Linux, cloud, and network — a ready source to adapt or run
+as-is against matching datasets.
 
 ## Layout
 
 ```
-compose/      docker-compose stack: opensearch, dashboards, the UI, the feeder + detector
-sensors/      zeek and suricata, parked for a future OT/pcap substrate
-feeders/      the routing sensor: raw telemetry -> JSON observations -> OpenSearch
-rules/        baseline/ (authored baseline), pipeline/ (enrichment), sigma/ (rules), correlation/
-ingest/       bundle dirs: raw telemetry, committed so a fresh clone runs out of the box
-ctl           up / ingest / detect / down / status / clean / dashboard / ui
-docs/         rule-authoring guides
+compose/      docker-compose stack: opensearch, dashboards, ui, detector
+feeders/      load.py — generic JSONL bulk loader (used by the UI; also callable directly)
+rules/        sigma/ (rules), correlation/ (aggregations), pipeline/ (field mappings)
+ingest/       dataset dirs: one subdir per dataset, each holding .jsonl files
+sensors/      zeek and suricata stubs (parked, future pcap profile)
+ctl           up / detect / down / status / clean / dashboard / ui
+docs/         authoring guides
 ```
-
-## Docs
-
-- [docs/authoring](docs/authoring) for writing detections on this stack: the
-  ingest-pipeline field mapping and the Sigma rules that match it.
-- [PLAN.md](PLAN.md) for the design record: what heimdallr is, the decisions taken,
-  and the milestones.

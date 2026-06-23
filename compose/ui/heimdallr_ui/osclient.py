@@ -104,8 +104,7 @@ def refresh(index: str) -> None:
 
 
 def bulk_index(index: str, docs, batch: int = 5000) -> tuple[int, int]:
-    """Bulk-index an iterable of dicts into `index`. Returns (indexed, errors).
-    The routing index carries a default pipeline, so the enrichment runs here."""
+    """Bulk-index an iterable of dicts into `index`. Returns (indexed, errors)."""
     indexed = errors = 0
     buf: list[str] = []
 
@@ -135,10 +134,9 @@ def index_doc(index: str, doc: dict, doc_id: str | None = None) -> None:
     _request("POST", path, doc)
 
 
-def loaded_bundles(index: str = "routing") -> dict[str, int]:
-    """Distinct `bundle` values currently present in the routing index, with their
-    doc counts. This is the source of truth for what is 'loaded': derived, not
-    stored separately."""
+def loaded_bundles(index: str = "logs") -> dict[str, int]:
+    """Distinct `bundle` values currently in the index, with their doc counts.
+    This is the source of truth for what is 'loaded': derived, not stored separately."""
     if not index_exists(index):
         return {}
     res = search(index, {

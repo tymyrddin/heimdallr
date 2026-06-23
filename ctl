@@ -1,20 +1,17 @@
 #!/usr/bin/env bash
 # ctl — heimdallr range control (OpenSearch + Sigma).
 #
-# heimdallr is a live detection range, not a wire tap. Inputs arrive as files in
-# ingest/, the routing feeder relays them as observations into OpenSearch, an
-# ingest pipeline enriches them (RFC 6811 ROV + covering aggregate, against
-# heimdallr's baseline), and detections surface on the dashboard. ctl brings the
-# stack up, applies the detection content (index template + ingest pipeline),
-# ingests, and tears down.
+# heimdallr is a detection engineering lab. Load datasets via the UI, author
+# Sigma rules under rules/sigma/, and run detections. ctl brings the stack up
+# and tears it down.
 #
 # Commands:
-#   up           start OpenSearch + Dashboards, apply the detection content
+#   up           start OpenSearch + Dashboards + UI
 #   down         stop the stack (data volume kept)
 #   status       show services + cluster health
-#   ingest       relay ingest/ into OpenSearch (refreshes the pipeline first)
-#   detect       compile the Sigma rules and run detections + correlation
+#   detect       compile the Sigma rules and run detections
 #   dashboard    print the dashboard URL
+#   ui           print the heimdallr UI URL
 #   clean        stop and remove the data volume (full reset)
 #
 # Security (auth/TLS) is disabled on the local node; this is a local range, not an
@@ -44,18 +41,6 @@ _wait_for_opensearch() {
     echo "[ctl] OpenSearch did not come up in time."; exit 1
 }
 
-# Apply heimdallr's routing detection content: the index template (mappings +
-# default pipeline) and the ingest pipeline (normalise + ROV/covering enrichment,
-# built from rules/baseline/aggregates.json and the observed VRPs in ingest/).
-_apply_detection() {
-    echo "[ctl] Applying the routing index template ..."
-    curl -fsS -XPUT "$OS_URL/_index_template/routing" \
-        -H 'Content-Type: application/json' \
-        --data-binary @rules/pipeline/index-routing.json >/dev/null
-    echo "[ctl] Building and applying the routing ingest pipeline ..."
-    OPENSEARCH_URL="$OS_URL" python3 rules/pipeline/build_pipeline.py ingest
-}
-
 # ---------------------------------------------------------------------------
 # Commands
 # ---------------------------------------------------------------------------
@@ -68,30 +53,20 @@ case "$CMD" in
     echo "[ctl] Starting OpenSearch + Dashboards + UI ..."
     $COMPOSE up -d --build opensearch dashboards ui
     _wait_for_opensearch
-    _apply_detection
     echo ""
     echo "  Range is up."
     echo "  heimdallr UI: http://localhost:5000"
     echo "  Dashboards:   http://localhost:5601"
     echo "  OpenSearch:   $OS_URL"
-    echo "  Load + run:   open the UI, or  ./ctl ingest  then  ./ctl detect"
+    echo "  Load data:    open the UI and drop datasets under ingest/"
+    echo "  Detect:       ./ctl detect"
     echo "  Stop:         ./ctl down"
-    ;;
-
-  ingest)
-    _wait_for_opensearch
-    # Refresh the pipeline so its VRP params match whatever is staged in ingest/.
-    _apply_detection
-    echo "[ctl] Relaying ingest/ into OpenSearch via the routing feeder ..."
-    $COMPOSE --profile sensors run --rm --build routing
-    curl -fsS -XPOST "$OS_URL/routing/_refresh" >/dev/null 2>&1 || true
-    echo "[ctl] Done. Watch the dashboard, or run a detection query."
     ;;
 
   detect)
     _wait_for_opensearch
-    echo "[ctl] Compiling the Sigma rules and running detections + correlation ..."
-    $COMPOSE --profile sensors run --rm --build routing-detector
+    echo "[ctl] Compiling the Sigma rules and running detections ..."
+    $COMPOSE --profile sensors run --rm --build detector
     ;;
 
   down)
@@ -120,11 +95,10 @@ case "$CMD" in
     cat <<'EOF'
 Usage: ./ctl <command>
 
-  up           start OpenSearch + Dashboards, apply the detection content
+  up           start OpenSearch + Dashboards + UI
   down         stop the stack (data volume kept)
   status       show services + cluster health
-  ingest       relay ingest/ into OpenSearch (refreshes the pipeline first)
-  detect       compile the Sigma rules and run detections + correlation
+  detect       compile the Sigma rules and run detections
   dashboard    print the dashboard URL
   ui           print the heimdallr UI URL
   clean        stop and remove the data volume (full reset)

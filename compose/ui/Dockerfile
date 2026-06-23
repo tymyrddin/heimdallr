@@ -4,8 +4,7 @@
 # compile rules in-process, plus Flask. Logic lives in the image; data lives on
 # mounts (rules/ read-write for the editor, ingest/ read-only for the explorer).
 #
-# Build context is the repo root (see docker-compose.yml), so the image can carry
-# the shared feeder + pipeline logic as the single source of truth, not a copy.
+# Build context is the repo root (see docker-compose.yml).
 FROM python:3.12-slim
 
 RUN pip install --no-cache-dir \
@@ -17,10 +16,6 @@ RUN pip install --no-cache-dir \
 
 WORKDIR /opt/heimdallr
 ENV PYTHONPATH=/opt/heimdallr PYTHONUNBUFFERED=1
-
-# Shared logic, reused not duplicated.
-COPY feeders/routing.py            /opt/heimdallr/routing.py
-COPY rules/pipeline/build_pipeline.py /opt/heimdallr/build_pipeline.py
 
 # The UI itself.
 COPY compose/ui/app.py             /opt/heimdallr/app.py

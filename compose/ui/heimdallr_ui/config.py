@@ -9,11 +9,8 @@ import os
 RULES_DIR = os.environ.get("HEIMDALLR_RULES", "/rules")
 INGEST_DIR = os.environ.get("HEIMDALLR_INGEST", "/ingest")
 
-ROUTING_INDEX = os.environ.get("ROUTING_INDEX", "routing")
+LOGS_INDEX = os.environ.get("LOGS_INDEX", "logs")
 RUNS_INDEX = os.environ.get("RUNS_INDEX", "heimdallr-runs")
 FINDINGS_INDEX = os.environ.get("FINDINGS_INDEX", "heimdallr-findings")
 
 SIGMA_DIR = os.path.join(RULES_DIR, "sigma")
-BASELINE_PATH = os.path.join(RULES_DIR, "baseline", "aggregates.json")
-INDEX_TEMPLATE_PATH = os.path.join(RULES_DIR, "pipeline", "index-routing.json")
-CORRELATION_PATH = os.path.join(RULES_DIR, "correlation", "arm-hijack.json")

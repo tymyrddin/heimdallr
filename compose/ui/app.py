@@ -94,7 +94,7 @@ def detections():
     return render_template("placeholder.html", page="Detections",
                            note="Sigma editor, rule selection and Run land in the next slice.",
                            rules=detector.available_rules(),
-                           loaded=osclient.loaded_bundles(config.ROUTING_INDEX))
+                           loaded=osclient.loaded_bundles(config.LOGS_INDEX))
 
 
 @app.route("/findings")
@@ -113,7 +113,7 @@ def experiments():
 @app.route("/api/runs", methods=["POST"])
 def api_create_run():
     payload = request.get_json(force=True, silent=True) or {}
-    bundle_names = payload.get("bundles") or list(osclient.loaded_bundles(config.ROUTING_INDEX))
+    bundle_names = payload.get("bundles") or list(osclient.loaded_bundles(config.LOGS_INDEX))
     rule_names = payload.get("rules") or [r["name"] for r in detector.available_rules()]
     job_id = jobs.submit("run", "detection run",
                          lambda b=bundle_names, r=rule_names: detector.run_detection(b, r))

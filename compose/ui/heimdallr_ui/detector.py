@@ -1,25 +1,16 @@
 """Detection runs: compile the selected Sigma rules with pySigma, run them over the
-loaded bundles, and persist a Run plus its findings.
+loaded datasets, and persist a Run plus its findings.
 
-A Run is the spine object. Everything else (the Detections live view, the
-Experiments ledger and diff) is a view over heimdallr-runs / heimdallr-findings.
+A Run is the spine object. The Experiments ledger shows run history and diffs.
 
-A finding is a DISTINCT anomaly, not a raw document: matches are bucketed by
-(bundle, prefix, origin_as), so the route-leak flood of 36k repeated announces
-collapses to the handful of leaked prefixes a detection engineer actually cares
-about. Each finding keeps a representative observation for the why-it-fired view and
-a matched_docs count for the noise-vs-signal story.
-
-The Run snapshots the body hash of every selected rule (ruleset_sha256), so the
-Experiments diff stays honest when a rule is edited in place. There is deliberately
-no expected-findings notion: findings are what fired, never a target.
+A finding collapses all matches for a rule in a bundle into one record with a
+representative event and a matched_docs count.
 """
 from __future__ import annotations
 
 import datetime
 import glob
 import hashlib
-import json
 import os
 import uuid
 
@@ -28,7 +19,6 @@ from sigma.backends.opensearch import OpensearchLuceneBackend
 
 from . import config, osclient
 
-_CORRELATION_NAME = "arm-hijack-correlation"
 _FINDING_BUCKETS = 1000
 
 
@@ -41,30 +31,25 @@ def _sha256(text: str) -> str:
 
 
 def available_rules() -> list[dict]:
-    """Every selectable detection: the Sigma rules under rules/sigma plus the
-    engine-form arm->hijack correlation."""
+    """Every selectable detection: the Sigma rules under rules/sigma."""
     out = []
     for path in sorted(glob.glob(os.path.join(config.SIGMA_DIR, "*.yml"))):
         name = os.path.splitext(os.path.basename(path))[0]
         try:
             title = SigmaCollection.load_ruleset([path]).rules[0].title
-        except Exception:  # noqa: BLE001 - a broken rule still lists, flagged elsewhere
+        except Exception:  # noqa: BLE001
             title = name
         out.append({"name": name, "kind": "sigma", "title": title, "path": path})
-    if os.path.isfile(config.CORRELATION_PATH):
-        out.append({"name": _CORRELATION_NAME, "kind": "correlation",
-                    "title": "arm->hijack correlation", "path": config.CORRELATION_PATH})
     return out
 
 
 def validate_rule(text: str) -> dict:
-    """Compile a Sigma rule body with pySigma. Returns {ok, query|error} for the
-    editor's inline validate."""
+    """Compile a Sigma rule body with pySigma. Returns {ok, queries|error}."""
     try:
         rules = SigmaCollection.from_yaml(text)
         queries = OpensearchLuceneBackend().convert(rules)
         return {"ok": True, "queries": queries}
-    except Exception as exc:  # noqa: BLE001 - report the compile error to the editor
+    except Exception as exc:  # noqa: BLE001
         return {"ok": False, "error": str(exc)}
 
 
@@ -74,7 +59,7 @@ def _bundle_filter(bundles: list[str]) -> dict:
 
 def _sigma_findings(run_id: str, rule: dict, bundles: list[str]) -> list[dict]:
     """Run one Sigma rule scoped to the selected bundles and collapse matches into
-    distinct findings."""
+    per-bundle findings."""
     backend = OpensearchLuceneBackend()
     rules = SigmaCollection.load_ruleset([rule["path"]])
     title = rules.rules[0].title
@@ -86,55 +71,22 @@ def _sigma_findings(run_id: str, rule: dict, bundles: list[str]) -> list[dict]:
                 "must": [{"query_string": {"query": query}}],
                 "filter": [_bundle_filter(bundles)],
             }},
-            "aggs": {"f": {
-                "composite": {"size": _FINDING_BUCKETS, "sources": [
-                    {"bundle": {"terms": {"field": "bundle"}}},
-                    {"prefix": {"terms": {"field": "prefix"}}},
-                    {"origin_as": {"terms": {"field": "origin_as", "missing_bucket": True}}},
-                ]},
+            "aggs": {"by_bundle": {
+                "terms": {"field": "bundle", "size": _FINDING_BUCKETS},
                 "aggs": {"rep": {"top_hits": {"size": 1}}},
             }},
         }
-        res = osclient.search(config.ROUTING_INDEX, body)
-        for bucket in res["aggregations"]["f"]["buckets"]:
+        res = osclient.search(config.LOGS_INDEX, body)
+        for bucket in res["aggregations"]["by_bundle"]["buckets"]:
             src = bucket["rep"]["hits"]["hits"][0]["_source"]
             findings.append({
                 "run_id": run_id, "kind": "sigma",
                 "rule": rule["name"], "rule_title": title,
-                "bundle": bucket["key"]["bundle"],
-                "ts": src.get("ts"),
-                "prefix": src.get("prefix"),
-                "origin_as": src.get("origin_as"),
-                "as_path": src.get("as_path"),
-                "covering_aggregate": src.get("covering_aggregate"),
-                "more_specific": src.get("more_specific"),
-                "origin_authorised": src.get("origin_authorised"),
-                "rpki_validity": src.get("rpki_validity"),
+                "bundle": bucket["key"],
+                "ts": src.get("ts") or src.get("@timestamp"),
                 "matched_docs": bucket["doc_count"],
                 "event": src,
             })
-    return findings
-
-
-def _correlation_findings(run_id: str, rule: dict, bundles: list[str]) -> list[dict]:
-    """Run the engine-form arm->hijack correlation scoped to the selected bundles."""
-    body = json.load(open(rule["path"]))
-    body.pop("_comment", None)
-    existing = body.setdefault("query", {}).setdefault("bool", {}).setdefault("filter", [])
-    existing.append(_bundle_filter(bundles))
-    res = osclient.search(config.ROUTING_INDEX, body)
-    findings = []
-    for bucket in res["aggregations"]["armed_aggregates"]["buckets"]:
-        key = bucket["key"]
-        findings.append({
-            "run_id": run_id, "kind": "correlation",
-            "rule": rule["name"], "rule_title": rule["title"],
-            "bundle": key["bundle"],
-            "covering_aggregate": key["cover"],
-            "matched_docs": bucket["hijack_notfound"]["doc_count"],
-            "event": {"arm": "roa-remove", "hijack": "notfound-announce",
-                      "covering_aggregate": key["cover"]},
-        })
     return findings
 
 
@@ -167,10 +119,7 @@ def run_detection(bundles: list[str], rule_names: list[str]) -> dict:
         all_findings: list[dict] = []
         by_rule: dict[str, int] = {}
         for r in selected:
-            if r["kind"] == "correlation":
-                fs = _correlation_findings(run_id, r, bundles)
-            else:
-                fs = _sigma_findings(run_id, r, bundles)
+            fs = _sigma_findings(run_id, r, bundles)
             by_rule[r["name"]] = len(fs)
             all_findings.extend(fs)
 
@@ -178,7 +127,7 @@ def run_detection(bundles: list[str], rule_names: list[str]) -> dict:
             osclient.bulk_index(config.FINDINGS_INDEX, all_findings)
             osclient.refresh(config.FINDINGS_INDEX)
 
-        events = osclient.count(config.ROUTING_INDEX, _bundle_filter(bundles)) if bundles else 0
+        events = osclient.count(config.LOGS_INDEX, _bundle_filter(bundles)) if bundles else 0
         run["status"] = "complete"
         run["counts"] = {
             "events": events,
@@ -186,7 +135,7 @@ def run_detection(bundles: list[str], rule_names: list[str]) -> dict:
             "matched_docs": sum(f.get("matched_docs", 0) for f in all_findings),
             "by_rule": by_rule,
         }
-    except Exception as exc:  # noqa: BLE001 - record the failure on the run
+    except Exception as exc:  # noqa: BLE001
         run["status"] = "error"
         run["error"] = str(exc)
     osclient.index_doc(config.RUNS_INDEX, run, doc_id=run_id)

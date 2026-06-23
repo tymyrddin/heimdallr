@@ -1,9 +1,8 @@
 # heimdallr running range: OpenSearch + Sigma detection lab.
 #
-# One persistent stack: an OpenSearch node (the data lake + detection engine, via
-# the Security Analytics and Alerting plugins) and OpenSearch Dashboards (the hunt
-# and alert surface). The routing feeder is an on-demand sensor that relays raw
-# routing observations into OpenSearch.
+# One persistent stack: an OpenSearch node (the data lake + detection engine) and
+# OpenSearch Dashboards (the hunt and alert surface). Load datasets via the UI;
+# run Sigma detections via the UI or `ctl detect`.
 #
 # Security: the auth/TLS plugin is disabled. heimdallr is a local detection range,
 # not an exposed service; disabling it keeps the lab single-command and avoids the
@@ -43,25 +42,9 @@ services:
       - "5601:5601"
     networks: [heimdallr]
 
-  # Routing sensor. BGP is not pcap-shaped, so the feeder stands in for a packet
-  # sensor: it reads the raw routing telemetry under /ingest and bulk-loads the
-  # observations into OpenSearch through the routing ingest pipeline. Run on
-  # demand by `ctl ingest` (profile sensors), parallel to how offline sensors run.
-  routing:
-    build: ../feeders
-    image: heimdallr-routing
-    profiles: ["sensors"]
-    depends_on: [opensearch]
-    environment:
-      - OPENSEARCH_URL=http://opensearch:9200
-    volumes:
-      - ../ingest:/ingest:ro
-    networks: [heimdallr]
-
   # heimdallr UI. The Flask surface: Data / Detections / Findings / Experiments.
-  # Built from the repo root so it can carry the shared feeder + pipeline logic as
-  # the single source of truth. Mounts rules/ read-write (the rule editor) and
-  # ingest/ read-only (the bundle explorer); reads and writes OpenSearch over HTTP.
+  # Mounts rules/ read-write (the rule editor) and ingest/ read-only (the dataset
+  # explorer); reads and writes OpenSearch over HTTP.
   ui:
     build:
       context: ..
@@ -79,9 +62,9 @@ services:
       - "5000:5000"
     networks: [heimdallr]
 
-  # Routing detector. Compiles the Sigma rules with pySigma and runs them, plus
-  # the engine-form arm->hijack correlation. Run on demand by `ctl detect`.
-  routing-detector:
+  # Sigma detector. Compiles every rule in rules/sigma with pySigma and runs them
+  # against the logs index. Run on demand by `ctl detect`.
+  detector:
     build: ./detector
     image: heimdallr-detector
     profiles: ["sensors"]
