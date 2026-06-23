@@ -1,11 +1,11 @@
 # Heimdallr
 
 A detection engineering tool built on OpenSearch and Sigma. Load any JSONL dataset,
-write or import Sigma rules, run them, and see exactly what fired and what did not —
+write or import Sigma rules, run them, and see exactly what fired and what did not: 
 scoped per dataset so you can tell whether a rule is specific or noisy.
 
-Four views drive the workflow: **Data** (what you have loaded), **Detections** (which
-rules to run), **Findings** (what fired, per dataset), **Experiments** (how results
+Four views drive the workflow: Data (what you have loaded), Detections (which
+rules to run), Findings (what fired, per dataset), Experiments (how results
 change as you iterate on a rule).
 
 ## Dependencies
@@ -32,10 +32,10 @@ Do not expose these ports off the host.
 
 Open `http://localhost:5000`:
 
-1. **Data** — drop a dataset directory under `ingest/`, then click **Load**.
-2. **Detections** — pick rules from `rules/sigma/` or author a new one.
-3. **Findings** — see what fired, per dataset, with a representative event.
-4. **Experiments** — compare runs as you iterate on a rule.
+1. Data: drop a dataset directory under `ingest/`, then click Load.
+2. Detections: pick rules from `rules/sigma/` or author a new one.
+3. Findings: see what fired, per dataset, with a representative event.
+4. Experiments: compare runs as you iterate on a rule.
 
 OpenSearch Dashboards at `http://localhost:5601` is the deep hunt-and-tune surface.
 
@@ -51,12 +51,12 @@ Good public sources:
 
 | Dataset | What it covers | Where |
 |---|---|---|
-| **OTRF Security Datasets** | Windows/Linux attack simulations, labelled by ATT&CK technique, JSONL-ready | github.com/OTRF/Security-Datasets |
-| **EVTX-ATTACK-SAMPLES** | Windows event log `.evtx` files per ATT&CK technique | github.com/sbousseaden/EVTX-ATTACK-SAMPLES |
-| **Atomic Red Team** | Test results from individual ATT&CK technique executions | github.com/redcanaryco/atomic-red-team |
-| **Boss of the SOC (BOTS) v3** | Full SOC scenario dataset | github.com/splunk/botsv3 |
+| OTRF Security Datasets | Windows/Linux attack simulations, labelled by ATT&CK technique, JSONL-ready | github.com/OTRF/Security-Datasets |
+| EVTX-ATTACK-SAMPLES | Windows event log `.evtx` files per ATT&CK technique | github.com/sbousseaden/EVTX-ATTACK-SAMPLES |
+| Atomic Red Team | Test results from individual ATT&CK technique executions | github.com/redcanaryco/atomic-red-team |
+| Boss of the SOC (BOTS) v3 | Full SOC scenario dataset | github.com/splunk/botsv3 |
 
-OTRF Security Datasets is the easiest starting point — many datasets ship as `.jsonl`
+OTRF Security Datasets is the easiest starting point: many datasets ship as `.jsonl`
 already, each tagged with the ATT&CK technique it exercises.
 
 ## Rules
@@ -66,14 +66,14 @@ by the detector and the UI's rule selector.
 
 The [Sigma specification](https://github.com/SigmaHQ/sigma-specification) covers the
 rule format. The [SigmaHQ community repo](https://github.com/SigmaHQ/sigma) has 3000+
-rules across Windows, Linux, cloud, and network — a ready source to adapt or run
+rules across Windows, Linux, cloud, and network, a ready source to adapt or run
 as-is against matching datasets.
 
 ## Layout
 
 ```
 compose/      docker-compose stack: opensearch, dashboards, ui, detector
-feeders/      load.py — generic JSONL bulk loader (used by the UI; also callable directly)
+feeders/      load.py: generic JSONL bulk loader (used by the UI; also callable directly)
 rules/        sigma/ (rules), correlation/ (aggregations), pipeline/ (field mappings)
 ingest/       dataset dirs: one subdir per dataset, each holding .jsonl files
 sensors/      zeek and suricata stubs (parked, future pcap profile)
